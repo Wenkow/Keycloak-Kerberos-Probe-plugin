@@ -6,6 +6,8 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # needed for creating releases
     steps:
       - uses: actions/checkout@v4
 
@@ -14,32 +16,24 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Extract version from tag and POM
-        id: ver
+      # Optional safety: ensure tag == pom.xml version
+      - name: Validate tag matches pom.xml
         run: |
           TAG="${GITHUB_REF_NAME#v}"
           POM_VER=$(mvn -q -Dexec.executable=echo \
             -Dexec.args='${project.version}' --non-recursive \
             org.codehaus.mojo:exec-maven-plugin:3.1.0:exec)
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-          echo "pom=$POM_VER" >> $GITHUB_OUTPUT
-          if [ "$TAG" != "$POM_VER" ]; then
-            echo "Tag ($TAG) and pom.xml version ($POM_VER) differ"; exit 1
-          fi
+          [ "$TAG" = "$POM_VER" ] || { echo "Tag $TAG != pom $POM_VER"; exit 1; }
 
-      - name: Build
+      - name: Build (skip tests)
         run: mvn -B -DskipTests package
 
-      - name: Prepare artifacts
-        run: |
-          mkdir -p dist
-          cp target/keycloak-krb-probe.jar dist/keycloak-krb-probe.jar
-          cp target/keycloak-krb-probe.jar "dist/keycloak-krb-probe-${{ steps.ver.outputs.pom }}.jar"
-
-      - name: Create GitHub Release
+      - name: Create/Update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            dist/keycloak-krb-probe.jar
-            dist/keycloak-krb-probe-${{ steps.ver.outputs.pom }}.jar
+          name: ${{ github.ref_name }}          # Release title e.g. v1.0.0
+          tag_name: ${{ github.ref_name }}      # Ensure correct tag
+          draft: false
+          prerelease: false
+          files: target/keycloak-krb-probe.jar  # single asset, fixed filename
 
