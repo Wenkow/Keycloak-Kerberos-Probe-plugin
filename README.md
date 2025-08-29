@@ -12,6 +12,10 @@ This plugin for Keycloak detects if a client is capable of Kerberos authenticati
 
 **Note:** This plugin does not configure Kerberos itself — you must already have a working Keycloak Kerberos setup. It only provides an automated detection layer.
 
+## Changelog 
+
+v1.1.0 - added configurable cookie lifespan
+
 ## Installation
 
 ### Download the JAR (releases) and place it into providers directory:

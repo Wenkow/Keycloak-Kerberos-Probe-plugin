@@ -36,6 +36,22 @@ public class BackchannelProbeAuthenticator implements Authenticator {
             timeout = 500;
         }
 
+        // Get cookie validity configuration
+        String cfgCookieValidity = Optional.ofNullable(ctx.getAuthenticatorConfig())
+                .map(c -> c.getConfig().get("cookieValiditySec")).orElse("1800");
+        int cookieValidity;
+        try {
+            cookieValidity = Math.max(60, Integer.parseInt(cfgCookieValidity)); // Minimum 60 seconds
+        } catch (Exception e) {
+            cookieValidity = 1800;
+        }
+
+        // Store cookie validity in session for provider to access
+        KeycloakSession session = ctx.getSession();
+        if (session != null) {
+            session.setAttribute("krb_cookie_validity", cookieValidity);
+        }
+
         String html =
                 "<!doctype html><meta charset=\"utf-8\">" +
                         "<script>(async()=>{" +

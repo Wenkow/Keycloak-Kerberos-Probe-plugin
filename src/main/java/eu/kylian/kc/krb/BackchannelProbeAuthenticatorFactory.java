@@ -20,6 +20,12 @@ public class BackchannelProbeAuthenticatorFactory implements AuthenticatorFactor
                     "If no response within this time, assume not capable and continue with form.",
                     ProviderConfigProperty.STRING_TYPE, "500");
 
+    private static final ProviderConfigProperty COOKIE_VALIDITY =
+            new ProviderConfigProperty("cookieValiditySec",
+                    "Cookie validity (seconds)",
+                    "How long to remember Kerberos capability (prevents repeated probes).",
+                    ProviderConfigProperty.STRING_TYPE, "1800");
+
     @Override
     public String getId() {
         return ID;
@@ -69,7 +75,7 @@ public class BackchannelProbeAuthenticatorFactory implements AuthenticatorFactor
 
     @Override
     public List<ProviderConfigProperty> getConfigProperties() {
-        return Collections.singletonList(TIMEOUT);
+        return List.of(TIMEOUT, COOKIE_VALIDITY);
     }
 
     @Override

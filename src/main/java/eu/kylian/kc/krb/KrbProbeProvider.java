@@ -21,15 +21,28 @@ public class KrbProbeProvider implements RealmResourceProvider {
     public static final String COOKIE = "KRB_CAPABLE";
     private static final String NTLM1 = "Negotiate TlRMTVNTUAABAAAAl4II4gAAAAAAAAAAAAAAAAAAAAAKAGFKAAAADw==";
 
+    private int getCookieValidity() {
+        try {
+            Object cookieValidity = session.getAttribute("krb_cookie_validity");
+            if (cookieValidity != null) {
+                return Integer.parseInt(cookieValidity.toString());
+            }
+        } catch (Exception e) {
+            // Fall back to default
+        }
+        return 1800;
+    }
+
     @GET
     @Path("test")
     public Response test(@jakarta.ws.rs.core.Context HttpHeaders headers) {
+        int cookieValidity = getCookieValidity();
         String a = Optional.ofNullable(headers.getHeaderString("Authorization")).orElse("");
-        NewCookie c0 = new NewCookie(COOKIE, "0", "/", null, null, 1800, true, true);
+        NewCookie c0 = new NewCookie(COOKIE, "0", "/", null, null, cookieValidity, true, true);
 
         boolean negotiate = a.regionMatches(true, 0, "Negotiate ", 0, 10);
         if (negotiate && !a.equals(NTLM1)) {
-            NewCookie c1 = new NewCookie(COOKIE, "1", "/", null, null, 1800, true, true);
+            NewCookie c1 = new NewCookie(COOKIE, "1", "/", null, null, cookieValidity, true, true);
             return Response.ok("OK").cookie(c1).build();
         }
         return Response.status(401)
@@ -41,8 +54,9 @@ public class KrbProbeProvider implements RealmResourceProvider {
     @GET
     @Path("mark")
     public Response mark(@jakarta.ws.rs.QueryParam("v") String v) {
+        int cookieValidity = getCookieValidity();
         String val = "1".equals(v) ? "1" : "0";
-        NewCookie c = new NewCookie(COOKIE, val, "/", null, null, 1800, true, true);
+        NewCookie c = new NewCookie(COOKIE, val, "/", null, null, cookieValidity, true, true);
         return Response.noContent().cookie(c).build();
     }
 

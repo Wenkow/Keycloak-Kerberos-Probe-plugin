@@ -1,4 +1,4 @@
-##Plugin diagram  
+## Plugin diagram  
 
 Actors:  
   BROWSER (incognito or normal)  
