@@ -12,9 +12,15 @@ This plugin for Keycloak detects if a client is capable of Kerberos authenticati
 
 **Note:** This plugin does not configure Kerberos itself — you must already have a working Keycloak Kerberos setup. It only provides an automated detection layer.
 
-## Changelog 
+## Changelog
+
+v1.2.0 - compatible with Keycloak 26.6.x; probe endpoint changed to `/.well-known/kerberos-probe` (see [CHANGELOG.md](CHANGELOG.md) for details)
 
 v1.1.0 - added configurable cookie lifespan
+
+> **Upgrading from v1.1.0:** The probe URL changed from `/realms/{realm}/krb/test` to
+> `/.well-known/kerberos-probe`. No configuration changes needed — the authenticator
+> generates the new URL automatically.
 
 ## Installation
 

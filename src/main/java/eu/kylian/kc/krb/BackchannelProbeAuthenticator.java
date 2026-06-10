@@ -18,57 +18,57 @@ public class BackchannelProbeAuthenticator implements Authenticator {
         String cookies = Optional.ofNullable(
                 ctx.getHttpRequest().getHttpHeaders().getRequestHeaders().getFirst("Cookie")
         ).orElse("");
-
         if (cookies.contains(COOKIE + "=1") || cookies.contains(COOKIE + "=0")) {
             ctx.attempted();
             return;
         }
 
         String realm = Optional.ofNullable(ctx.getRealm()).map(RealmModel::getName).orElse("master");
-        String base = "/realms/" + realm + "/krb";
-
-        String cfgTimeout = Optional.ofNullable(ctx.getAuthenticatorConfig())
-                .map(c -> c.getConfig().get("timeoutMs")).orElse("500");
-        int timeout;
-        try {
-            timeout = Math.max(100, Integer.parseInt(cfgTimeout));
-        } catch (Exception e) {
-            timeout = 500;
-        }
-
-        // Get cookie validity configuration
-        String cfgCookieValidity = Optional.ofNullable(ctx.getAuthenticatorConfig())
-                .map(c -> c.getConfig().get("cookieValiditySec")).orElse("1800");
-        int cookieValidity;
-        try {
-            cookieValidity = Math.max(60, Integer.parseInt(cfgCookieValidity)); // Minimum 60 seconds
-        } catch (Exception e) {
-            cookieValidity = 1800;
-        }
-
-        // Store cookie validity in session for provider to access
-        KeycloakSession session = ctx.getSession();
-        if (session != null) {
-            session.setAttribute("krb_cookie_validity", cookieValidity);
-        }
+        int cv = getCookieValidity(ctx);
+        int timeout = getTimeout(ctx);
+        String probeUrl = "/realms/" + realm + "/.well-known/kerberos-probe?cv=" + cv;
+        String secureAttr = KrbProbeWellKnown.isHttps(ctx.getHttpRequest()) ? ";Secure" : "";
+        String cookieVal = "KRB_CAPABLE=0;path=/;max-age=" + cv + ";SameSite=Lax" + secureAttr;
 
         String html =
                 "<!doctype html><meta charset=\"utf-8\">" +
-                        "<script>(async()=>{" +
-                        "let done=false;" +
-                        "const go=u=>fetch(u,{credentials:'include',cache:'no-store',redirect:'manual'}).catch(()=>{});" +
-                        "setTimeout(()=>{ if(!done){ go('" + base + "/mark?v=0'); location.replace(location.href);} }, " + timeout + ");" +
-                        "try{ await go('" + base + "/test'); done=true; location.replace(location.href);}catch(e){}" +
-                        "})();</script>";
+                "<script>(async()=>{" +
+                "let done=false;" +
+                "const go=u=>fetch(u,{credentials:'include',cache:'no-store',redirect:'manual'}).catch(()=>{});" +
+                "setTimeout(()=>{ if(!done){" +
+                "document.cookie='" + cookieVal + "';" +
+                "location.replace(location.href);} }," + timeout + ");" +
+                "try{ const r=await go('" + probeUrl + "'); done=true;" +
+                "if(!r||r.status!==200)document.cookie='" + cookieVal + "';" +
+                "location.replace(location.href);}catch(e){}" +
+                "})();</script>";
 
-        Response page = Response.ok(html)
+        ctx.forceChallenge(Response.ok(html)
                 .header("Cache-Control", "no-store, no-cache, must-revalidate")
                 .header("Pragma", "no-cache")
                 .header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'")
                 .type(MediaType.TEXT_HTML_TYPE)
-                .build();
+                .build());
+    }
 
-        ctx.forceChallenge(page);
+    private int getCookieValidity(AuthenticationFlowContext ctx) {
+        String raw = Optional.ofNullable(ctx.getAuthenticatorConfig())
+                .map(c -> c.getConfig().get("cookieValiditySec")).orElse("1800");
+        try {
+            return Math.max(60, Integer.parseInt(raw));
+        } catch (Exception e) {
+            return 1800;
+        }
+    }
+
+    private int getTimeout(AuthenticationFlowContext ctx) {
+        String raw = Optional.ofNullable(ctx.getAuthenticatorConfig())
+                .map(c -> c.getConfig().get("timeoutMs")).orElse("500");
+        try {
+            return Math.max(100, Integer.parseInt(raw));
+        } catch (Exception e) {
+            return 500;
+        }
     }
 
     @Override
