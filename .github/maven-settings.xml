@@ -1,0 +1,10 @@
+<settings>
+  <mirrors>
+    <!-- repository.jboss.org redirects to a new path that hangs; everything we need is on Central -->
+    <mirror>
+      <id>central-for-jboss</id>
+      <mirrorOf>jboss-public-repository</mirrorOf>
+      <url>https://repo.maven.apache.org/maven2</url>
+    </mirror>
+  </mirrors>
+</settings>

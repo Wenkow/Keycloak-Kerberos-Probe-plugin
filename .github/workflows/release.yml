@@ -5,13 +5,20 @@ on:
     tags: ['v*.*.*']
   workflow_dispatch: {}
 
+env:
+  MAVEN_ARGS: >-
+    -s .github/maven-settings.xml
+    -Daether.connector.connectTimeout=15000 -Daether.connector.requestTimeout=30000
+    -Dmaven.wagon.http.connectionTimeout=15000 -Dmaven.wagon.http.readTimeout=30000
+
 jobs:
   test:
     name: Unit tests
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
@@ -20,7 +27,7 @@ jobs:
         run: mvn -B clean test
       - name: Upload Surefire reports on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: surefire-reports
           path: target/surefire-reports/**
@@ -28,10 +35,11 @@ jobs:
   build:
     name: Package JAR
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: test
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
@@ -47,7 +55,7 @@ jobs:
       - name: Package (skip tests)
         run: mvn -B -DskipTests package
       - name: Upload JAR
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: keycloak-krb-probe
           path: target/keycloak-krb-probe.jar
@@ -55,18 +63,19 @@ jobs:
   release:
     name: Publish GitHub Release
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: build
     if: startsWith(github.ref, 'refs/tags/')
     permissions:
       contents: write
     steps:
       - name: Download JAR artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: keycloak-krb-probe
           path: dist
       - name: Create/Update GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: ${{ github.ref_name }}
           tag_name: ${{ github.ref_name }}
