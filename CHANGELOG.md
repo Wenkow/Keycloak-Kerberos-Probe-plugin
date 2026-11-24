@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.1] - 2026-11-24
+
+### Fixed
+
+- Microsoft Edge left the native Windows Security credential dialog open after the
+  redirect to the login form when the client had no Kerberos ticket. The probe `fetch` is
+  now bound to an `AbortController` and aborted before every `location.replace`, which
+  cancels the pending request and closes the dialog.
+
 ## [1.2.0] - 2026-06-10
 
 ### Changed

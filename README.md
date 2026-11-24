@@ -14,6 +14,8 @@ This plugin for Keycloak detects if a client is capable of Kerberos authenticati
 
 ## Changelog
 
+v1.2.1 - fixed Edge leaving the Windows Security credential dialog open after redirect
+
 v1.2.0 - compatible with Keycloak 26.6.x; probe endpoint changed to `/.well-known/kerberos-probe` (see [CHANGELOG.md](CHANGELOG.md) for details)
 
 v1.1.0 - added configurable cookie lifespan

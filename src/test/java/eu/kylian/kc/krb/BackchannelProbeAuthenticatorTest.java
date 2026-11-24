@@ -107,6 +107,19 @@ class BackchannelProbeAuthenticatorTest {
     }
 
     @Test
+    void probeHtmlAbortsPendingFetchBeforeNavigation() {
+        AuthenticationFlowContext ctx = mockCtx(null);
+        new BackchannelProbeAuthenticator().authenticate(ctx);
+
+        ArgumentCaptor<Response> cap = ArgumentCaptor.forClass(Response.class);
+        verify(ctx).forceChallenge(cap.capture());
+        String body = (String) cap.getValue().getEntity();
+        assertTrue(body.contains("signal:ac.signal"), "fetch must be bound to an AbortController");
+        assertTrue(body.indexOf("ac.abort()") < body.indexOf("location.replace"),
+                "pending probe must be aborted before navigating (closes Edge auth dialog)");
+    }
+
+    @Test
     void probeHtmlSetsCookieZeroOnNon200Response() {
         AuthenticationFlowContext ctx = mockCtx(null);
         new BackchannelProbeAuthenticator().authenticate(ctx);

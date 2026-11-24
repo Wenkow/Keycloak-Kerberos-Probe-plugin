@@ -34,13 +34,16 @@ public class BackchannelProbeAuthenticator implements Authenticator {
                 "<!doctype html><meta charset=\"utf-8\">" +
                 "<script>(async()=>{" +
                 "let done=false;" +
-                "const go=u=>fetch(u,{credentials:'include',cache:'no-store',redirect:'manual'}).catch(()=>{});" +
-                "setTimeout(()=>{ if(!done){" +
-                "document.cookie='" + cookieVal + "';" +
-                "location.replace(location.href);} }," + timeout + ");" +
-                "try{ const r=await go('" + probeUrl + "'); done=true;" +
-                "if(!r||r.status!==200)document.cookie='" + cookieVal + "';" +
-                "location.replace(location.href);}catch(e){}" +
+                "const ac=new AbortController();" +
+                "const go=u=>fetch(u,{credentials:'include',cache:'no-store',redirect:'manual',signal:ac.signal}).catch(()=>{});" +
+                // abort() cancels the pending probe so Edge closes its native auth dialog
+                "const fin=bad=>{ if(done)return; done=true;" +
+                "if(bad)document.cookie='" + cookieVal + "';" +
+                "try{ac.abort();}catch(e){}" +
+                "location.replace(location.href); };" +
+                "setTimeout(()=>fin(true)," + timeout + ");" +
+                "try{ const r=await go('" + probeUrl + "');" +
+                "fin(!r||r.status!==200);}catch(e){}" +
                 "})();</script>";
 
         ctx.forceChallenge(Response.ok(html)
