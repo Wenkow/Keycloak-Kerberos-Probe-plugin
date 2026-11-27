@@ -120,24 +120,35 @@ Set **Internal networks** in the configuration of the `Kerberos Backchannel Prob
 
 How it works:
 
-* The value is a list of CIDR prefixes, IPv4 and IPv6, separated by commas, semicolons, spaces or new lines.
-  A bare address (`192.0.2.5`) is treated as a single host.
-* The field is optional. Empty means every client, which is the behavior of earlier versions.
-* The probe checks the client IP first, before it looks at the `KRB_CAPABLE` cookie. A client outside the
-  listed networks gets no probe and no cookie, and the flow goes on to the login form.
-* The probe records the result in the authentication session. `Condition - KRB_CAPABLE` reads it, so the
-  same list also covers the Kerberos step. A `KRB_CAPABLE=1` cookie from an earlier visit inside the
-  network does not trigger Kerberos when the client is now outside. You configure the list once, on the probe.
-* An invalid entry is logged as a warning and skipped. If the field is not empty but no entry is valid,
-  no client matches, so Kerberos is off for everyone. Check the server log after changing the value.
-* Host names are not resolved. IPv4-mapped IPv6 addresses (`::ffff:10.0.0.1`) match IPv4 prefixes.
+* The value is a list of CIDR prefixes (IPv4 and IPv6) separated by commas, semicolons, spaces or new lines.
+  A bare address such as `192.0.2.5` is a single host. Host names are not resolved.
+  IPv4-mapped IPv6 addresses (`::ffff:10.0.0.1`) match IPv4 prefixes.
+* **Empty field: every client gets the probe and the Kerberos challenge**, as in earlier versions.
+  With at least one entry, only clients from the listed networks get them.
+* The probe checks the client IP before the `KRB_CAPABLE` cookie. A client outside the list gets no probe and
+  no cookie, and the flow goes on to the login form.
+* The probe saves the result in the authentication session, and `Condition - KRB_CAPABLE` reads it. The list
+  therefore also covers the Kerberos step, and you configure it once, on the probe. A `KRB_CAPABLE=1` cookie
+  from an earlier visit inside the network does not start Kerberos when the client is now outside.
 
-Keep the probe in the flow when you use the list. `Condition - KRB_CAPABLE` needs it to know the network.
-Without the probe in the same flow the condition falls back to checking the cookie only.
+Invalid entries (a typo, a bad prefix length, a host name) are skipped and logged as a warning. The list never
+falls back to "all clients":
+
+| Field content | Who gets the probe |
+|---|---|
+| empty | everyone |
+| valid entries only | clients inside those networks |
+| valid and invalid entries | clients inside the valid networks; a client that only the broken entry would have matched is treated as outside |
+| no valid entry | nobody, so Kerberos is off for everyone |
+
+Check the server log after you change the value.
+
+Keep the probe in the flow when you use the list, because `Condition - KRB_CAPABLE` needs it to learn the
+network. Without the probe in the same flow, the condition checks only the cookie.
 
 The plugin takes the address from `ClientConnection.getRemoteAddr()`. Behind a reverse proxy, Keycloak
 returns the real client address only when proxy headers are enabled, for example
 `KC_PROXY_HEADERS=xforwarded`, and the proxy must pass the client address in `X-Forwarded-For`.
 Otherwise every client appears with the proxy's address.
 
-Deeper explanation of how plugin works can be find in [detailed flow diagram](docs/flow.md).
+For a step-by-step description of the plugin, see the [detailed flow](docs/flow.md).

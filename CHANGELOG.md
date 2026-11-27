@@ -12,7 +12,8 @@
   authentication session, so a `KRB_CAPABLE=1` cookie from an earlier visit inside the network
   does not trigger Kerberos from outside. Without the probe in the same flow the condition only
   checks the cookie, as before.
-- Invalid entries are logged and skipped. A non-empty list with no valid entry matches no client.
+- Invalid entries are logged and skipped; valid ones still apply. A non-empty list with no valid entry
+  matches no client. Only an empty field means all clients.
 
 ## [1.2.1] - 2026-11-24
 
