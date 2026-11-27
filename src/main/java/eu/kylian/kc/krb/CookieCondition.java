@@ -5,6 +5,7 @@ import org.keycloak.authentication.Authenticator;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserModel;
+import org.keycloak.sessions.AuthenticationSessionModel;
 
 import java.util.Optional;
 
@@ -16,7 +17,12 @@ public class CookieCondition implements Authenticator {
         String c = Optional.ofNullable(
                 ctx.getHttpRequest().getHttpHeaders().getRequestHeaders().getFirst("Cookie")
         ).orElse("");
-        if (c.contains(COOKIE + "=1")) {
+        // The probe step records whether the client is in an internal network. A cookie from an earlier
+        // visit inside the network must not trigger Kerberos from outside it.
+        AuthenticationSessionModel session = ctx.getAuthenticationSession();
+        boolean outsideNetworks = session != null
+                && "0".equals(session.getAuthNote(BackchannelProbeAuthenticator.NET_NOTE));
+        if (c.contains(COOKIE + "=1") && !outsideNetworks) {
             ctx.success();
         } else {
             ctx.attempted();

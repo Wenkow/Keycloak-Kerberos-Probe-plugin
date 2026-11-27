@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.3.0] - 2026-11-27
+
+### Added
+
+- Optional `Internal networks` setting on the probe execution: a list of IPv4/IPv6 CIDR prefixes.
+  Clients outside the list get no probe and no `KRB_CAPABLE` cookie, so they never receive a
+  `401 Negotiate` challenge and never see the native Windows credential dialog. Empty (the default)
+  keeps the old behavior for all clients.
+- `Condition - KRB_CAPABLE` also honors the list. The probe stores the network result in the
+  authentication session, so a `KRB_CAPABLE=1` cookie from an earlier visit inside the network
+  does not trigger Kerberos from outside. Without the probe in the same flow the condition only
+  checks the cookie, as before.
+- Invalid entries are logged and skipped. A non-empty list with no valid entry matches no client.
+
 ## [1.2.1] - 2026-11-24
 
 ### Fixed

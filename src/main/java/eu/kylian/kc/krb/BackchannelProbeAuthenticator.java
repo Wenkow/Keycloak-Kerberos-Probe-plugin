@@ -7,14 +7,31 @@ import org.keycloak.authentication.Authenticator;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserModel;
+import org.keycloak.sessions.AuthenticationSessionModel;
 
 import java.util.Optional;
 
 public class BackchannelProbeAuthenticator implements Authenticator {
     public static final String COOKIE = "KRB_CAPABLE";
+    /** Auth session note: "1" if the client is in an internal network, "0" if not. Absent if no list is set. */
+    public static final String NET_NOTE = "KRB_NET_OK";
+    public static final String NETWORKS_CONFIG = "internalNetworks";
 
     @Override
     public void authenticate(AuthenticationFlowContext ctx) {
+        NetworkMatcher networks = NetworkMatcher.parse(getConfig(ctx, NETWORKS_CONFIG, ""));
+        if (!networks.isUnrestricted()) {
+            String clientIp = ctx.getConnection() == null ? null : ctx.getConnection().getRemoteAddr();
+            boolean internal = networks.matches(clientIp);
+            AuthenticationSessionModel session = ctx.getAuthenticationSession();
+            if (session != null) session.setAuthNote(NET_NOTE, internal ? "1" : "0");
+            if (!internal) {
+                // Outside the listed networks: no probe, no cookie, so Kerberos stays off for this client.
+                ctx.attempted();
+                return;
+            }
+        }
+
         String cookies = Optional.ofNullable(
                 ctx.getHttpRequest().getHttpHeaders().getRequestHeaders().getFirst("Cookie")
         ).orElse("");
@@ -52,6 +69,13 @@ public class BackchannelProbeAuthenticator implements Authenticator {
                 .header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'")
                 .type(MediaType.TEXT_HTML_TYPE)
                 .build());
+    }
+
+    private static String getConfig(AuthenticationFlowContext ctx, String key, String def) {
+        return Optional.ofNullable(ctx.getAuthenticatorConfig())
+                .map(c -> c.getConfig())
+                .map(m -> m.get(key))
+                .orElse(def);
     }
 
     private int getCookieValidity(AuthenticationFlowContext ctx) {

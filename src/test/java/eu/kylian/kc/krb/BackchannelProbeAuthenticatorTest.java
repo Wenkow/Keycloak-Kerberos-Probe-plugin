@@ -7,6 +7,8 @@ import jakarta.ws.rs.core.Response;
 import org.junit.jupiter.api.Test;
 import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.http.HttpRequest;
+import org.keycloak.common.ClientConnection;
+import org.keycloak.sessions.AuthenticationSessionModel;
 import org.keycloak.models.AuthenticatorConfigModel;
 import org.keycloak.models.RealmModel;
 import org.mockito.ArgumentCaptor;
@@ -152,6 +154,81 @@ class BackchannelProbeAuthenticatorTest {
         verify(ctx).forceChallenge(cap.capture());
         String body = (String) cap.getValue().getEntity();
         assertFalse(body.contains(";Secure"), "JS cookie must not include ;Secure when X-Forwarded-Proto is http");
+    }
+
+    private AuthenticationFlowContext mockNetCtx(String networks, String clientIp, String cookieHeader,
+                                                 AuthenticationSessionModel session) {
+        AuthenticationFlowContext ctx = mockCtx(cookieHeader);
+        AuthenticatorConfigModel cfg = mock(AuthenticatorConfigModel.class);
+        when(cfg.getConfig()).thenReturn(Map.of("internalNetworks", networks));
+        when(ctx.getAuthenticatorConfig()).thenReturn(cfg);
+        ClientConnection conn = mock(ClientConnection.class);
+        when(conn.getRemoteAddr()).thenReturn(clientIp);
+        when(ctx.getConnection()).thenReturn(conn);
+        when(ctx.getAuthenticationSession()).thenReturn(session);
+        return ctx;
+    }
+
+    @Test
+    void probesClientInsideConfiguredNetwork() {
+        AuthenticationSessionModel session = mock(AuthenticationSessionModel.class);
+        AuthenticationFlowContext ctx = mockNetCtx("10.0.0.0/8, fd00::/8", "10.1.2.3", null, session);
+        new BackchannelProbeAuthenticator().authenticate(ctx);
+
+        verify(ctx).forceChallenge(any());
+        verify(session).setAuthNote("KRB_NET_OK", "1");
+    }
+
+    @Test
+    void probesIpv6ClientInsideConfiguredNetwork() {
+        AuthenticationSessionModel session = mock(AuthenticationSessionModel.class);
+        AuthenticationFlowContext ctx = mockNetCtx("10.0.0.0/8, fd00::/8", "fd00::42", null, session);
+        new BackchannelProbeAuthenticator().authenticate(ctx);
+
+        verify(ctx).forceChallenge(any());
+        verify(session).setAuthNote("KRB_NET_OK", "1");
+    }
+
+    @Test
+    void skipsProbeOutsideConfiguredNetwork() {
+        AuthenticationSessionModel session = mock(AuthenticationSessionModel.class);
+        AuthenticationFlowContext ctx = mockNetCtx("10.0.0.0/8", "203.0.113.9", null, session);
+        new BackchannelProbeAuthenticator().authenticate(ctx);
+
+        verify(ctx).attempted();
+        verify(ctx, never()).forceChallenge(any());
+        verify(session).setAuthNote("KRB_NET_OK", "0");
+    }
+
+    @Test
+    void marksOutsideClientEvenWhenCookieAlreadyPresent() {
+        AuthenticationSessionModel session = mock(AuthenticationSessionModel.class);
+        AuthenticationFlowContext ctx = mockNetCtx("10.0.0.0/8", "203.0.113.9", "KRB_CAPABLE=1", session);
+        new BackchannelProbeAuthenticator().authenticate(ctx);
+
+        verify(ctx).attempted();
+        verify(session).setAuthNote("KRB_NET_OK", "0");
+    }
+
+    @Test
+    void marksInsideClientAndHonoursExistingCookie() {
+        AuthenticationSessionModel session = mock(AuthenticationSessionModel.class);
+        AuthenticationFlowContext ctx = mockNetCtx("10.0.0.0/8", "10.9.9.9", "KRB_CAPABLE=1", session);
+        new BackchannelProbeAuthenticator().authenticate(ctx);
+
+        verify(ctx).attempted();
+        verify(ctx, never()).forceChallenge(any());
+        verify(session).setAuthNote("KRB_NET_OK", "1");
+    }
+
+    @Test
+    void emptyNetworkListProbesEveryoneAndSetsNoNote() {
+        AuthenticationSessionModel session = mock(AuthenticationSessionModel.class);
+        AuthenticationFlowContext ctx = mockNetCtx("  ", "203.0.113.9", null, session);
+        new BackchannelProbeAuthenticator().authenticate(ctx);
+
+        verify(ctx).forceChallenge(any());
+        verify(session, never()).setAuthNote(any(), any());
     }
 
     @Test

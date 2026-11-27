@@ -26,6 +26,14 @@ public class BackchannelProbeAuthenticatorFactory implements AuthenticatorFactor
                     "How long to remember Kerberos capability (prevents repeated probes).",
                     ProviderConfigProperty.STRING_TYPE, "1800");
 
+    private static final ProviderConfigProperty INTERNAL_NETWORKS =
+            new ProviderConfigProperty(BackchannelProbeAuthenticator.NETWORKS_CONFIG,
+                    "Internal networks (optional)",
+                    "CIDR prefixes, IPv4 and IPv6, separated by comma or new line (e.g. 10.0.0.0/8, 192.168.0.0/16, fd00::/8). " +
+                    "The probe and the Kerberos condition run only for clients from these networks. " +
+                    "Leave empty to apply them to all clients.",
+                    ProviderConfigProperty.TEXT_TYPE, "");
+
     @Override
     public String getId() {
         return ID;
@@ -75,7 +83,7 @@ public class BackchannelProbeAuthenticatorFactory implements AuthenticatorFactor
 
     @Override
     public List<ProviderConfigProperty> getConfigProperties() {
-        return List.of(TIMEOUT, COOKIE_VALIDITY);
+        return List.of(TIMEOUT, COOKIE_VALIDITY, INTERNAL_NETWORKS);
     }
 
     @Override

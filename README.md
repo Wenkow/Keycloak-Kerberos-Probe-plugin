@@ -8,11 +8,14 @@ This plugin for Keycloak detects if a client is capable of Kerberos authenticati
 - Checks if the client supports Kerberos using javascript.
 - Skips Kerberos challenge for clients that cannot respond.
 - Allows configuring probe timeout (default: 500ms).
+- Can run the probe only for clients from listed IPv4/IPv6 networks (optional, default: all clients).
 - Integrates directly into Keycloak authentication flows.
 
 **Note:** This plugin does not configure Kerberos itself — you must already have a working Keycloak Kerberos setup. It only provides an automated detection layer.
 
 ## Changelog
+
+v1.3.0 - optional `Internal networks` setting: the probe and the Kerberos condition run only for clients from the listed IPv4/IPv6 prefixes
 
 v1.2.1 - fixed Edge leaving the Windows Security credential dialog open after redirect
 
@@ -101,5 +104,40 @@ Key points for setting this up:
 * Kerberos step executes SPNEGO authentication.
 
 * If probe fails or Kerberos fails → flow continues to Username/Password Form.
+
+## Limiting the probe to internal networks
+
+Some browsers (Edge on Windows, for example) open a native credential dialog when they get a
+`401 Negotiate` and have no Kerberos ticket. That happens on any machine without a ticket, including
+laptops outside your network, and the plugin cannot close that dialog. The fix is to not send the
+challenge to those clients at all.
+
+Set **Internal networks** in the configuration of the `Kerberos Backchannel Probe` execution:
+
+```
+10.0.0.0/8, 192.168.0.0/16, fd00::/8
+```
+
+How it works:
+
+* The value is a list of CIDR prefixes, IPv4 and IPv6, separated by commas, semicolons, spaces or new lines.
+  A bare address (`192.0.2.5`) is treated as a single host.
+* The field is optional. Empty means every client, which is the behavior of earlier versions.
+* The probe checks the client IP first, before it looks at the `KRB_CAPABLE` cookie. A client outside the
+  listed networks gets no probe and no cookie, and the flow goes on to the login form.
+* The probe records the result in the authentication session. `Condition - KRB_CAPABLE` reads it, so the
+  same list also covers the Kerberos step. A `KRB_CAPABLE=1` cookie from an earlier visit inside the
+  network does not trigger Kerberos when the client is now outside. You configure the list once, on the probe.
+* An invalid entry is logged as a warning and skipped. If the field is not empty but no entry is valid,
+  no client matches, so Kerberos is off for everyone. Check the server log after changing the value.
+* Host names are not resolved. IPv4-mapped IPv6 addresses (`::ffff:10.0.0.1`) match IPv4 prefixes.
+
+Keep the probe in the flow when you use the list. `Condition - KRB_CAPABLE` needs it to know the network.
+Without the probe in the same flow the condition falls back to checking the cookie only.
+
+The plugin takes the address from `ClientConnection.getRemoteAddr()`. Behind a reverse proxy, Keycloak
+returns the real client address only when proxy headers are enabled, for example
+`KC_PROXY_HEADERS=xforwarded`, and the proxy must pass the client address in `X-Forwarded-For`.
+Otherwise every client appears with the proxy's address.
 
 Deeper explanation of how plugin works can be find in [detailed flow diagram](docs/flow.md).
